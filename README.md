@@ -1,304 +1,543 @@
-﻿# GeoAgentic — Emergency Vehicle Control Room
+# 🏚️ Richter's Predictor — Earthquake Building Damage Classification
 
-GeoAgentic is a Bengaluru-focused emergency dispatch demo that combines a React frontend, a FastAPI backend, and a SQLite-backed decision engine to simulate real-time vehicle routing, incident handling, and operator recommendations.
+### Machine Learning Mini-Project | UE24CS352A
 
-It is designed to show how a dispatch control room can:
-- monitor multiple emergency vehicles,
-- create missions and routes,
-- inject incidents (accident, traffic, flood, roadblock, hazard, etc.),
-- trigger GeoAgent decision logic,
-- allow a human dispatcher to approve or reject reroutes.
+Predicting earthquake-related building damage using machine learning models and structural, material, and geographic features from the 2015 Gorkha earthquake in Nepal.
 
-This project is a working demo and is intentionally scoped to a Bengaluru urban bounding box for validation and realistic route logic.
+![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python)
+![Machine Learning](https://img.shields.io/badge/Machine%20Learning-Classification-orange)
+![NumPy](https://img.shields.io/badge/Neural%20Network-NumPy-013243?logo=numpy)
+![Status](https://img.shields.io/badge/Project-Academic-green)
 
-## What this app does
+---
 
-The product contains three primary dashboards:
-- Control Room: multi-vehicle dispatch and incident management
-- Driver: per-vehicle mission view and status
-- Admin: system health, routing status, and fleet data
+## 📌 Table of Contents
 
-The app supports:
-- live-ish vehicle simulation,
-- route generation and ETA calculation,
-- incident-to-recommendation workflow,
-- suggestion acceptance or dismissal,
-- fallback behavior when external APIs are unavailable.
+- [Project Overview](#-project-overview)
+- [Problem Statement](#-problem-statement)
+- [Objectives](#-objectives)
+- [Dataset](#-dataset)
+- [Machine Learning Models](#-machine-learning-models)
+- [Project Workflow](#-project-workflow)
+- [Project Structure](#-project-structure)
+- [Technologies Used](#-technologies-used)
+- [Installation and Setup](#-installation-and-setup)
+- [How to Run the Project](#-how-to-run-the-project)
+- [Results and Evaluation](#-results-and-evaluation)
+- [Output Files](#-output-files)
+- [Troubleshooting](#-troubleshooting)
+- [Future Enhancements](#-future-enhancements)
+- [References](#-references)
+- [Team Members](#-team-members)
 
-## Architecture overview
+---
 
-### 1. Frontend
-Location: `frontend/`
+## 🌍 Project Overview
 
-Technology:
-- React 18
-- Vite
-- Leaflet + react-leaflet
-- CSS
+The 2015 Gorkha earthquake in Nepal caused extensive damage to buildings and infrastructure. Identifying the likely severity of building damage can help organize post-earthquake inspections and disaster-response activities.
 
-Responsibilities:
-- landing page and role picker,
-- three dashboards,
-- map rendering and route drawing,
-- mission creation,
-- incident injection,
-- live UI updates from backend state.
+**Richter's Predictor** is a machine learning project that classifies buildings into three damage grades using their structural characteristics, construction materials, geographic information, and other recorded attributes.
 
-### 2. Backend
-Location: `backend/app/`
+The project compares three machine learning approaches:
 
-Technology:
-- FastAPI
-- SQLAlchemy
-- Pydantic
-- SQLite by default
+- K-Nearest Neighbours (KNN)
+- Neural Network implemented using NumPy
+- Random Forest Classifier
 
-Main modules:
-- `main.py`: API entrypoint, startup hooks, background simulation loop
-- `config.py`: environment variables and integration toggles
-- `database.py`: database engine and SQLite migration logic
-- `models.py`: database schema and entities
-- `schemas.py`: request/response validation
-- `routing.py`: route generation and route resolution
-- `decision_engine.py`: rule-based recommendation logic
-- `simulation.py`: simulated GPS movement and mission progression
-- `traffic_monitor.py`: route incident checks
-- `agents.py`: LangGraph-based decision workflow
-- `live.py`: live traffic and map data access
-- `places.py`: built-in place dataset
+The project includes data preprocessing, model training, evaluation, visualization, prediction generation, and automated report and presentation creation.
 
-### 3. Data layer
-- Default database: SQLite file at `backend/geoagentic.db`
-- Database URL can be overridden through `DATABASE_URL`
-- `schema.sql` at the project root contains the portable DDL reference
+> ⚠️ **Disclaimer:** This project is intended for academic learning and experimentation. Its predictions must not replace professional structural inspections or be used alone for building safety, evacuation, or emergency-response decisions.
 
-### 4. External integrations (optional)
-The app works without any external keys. When keys are not configured, it falls back to mock routing and templated explanations.
+## 🎯 Problem Statement
 
-Optional services:
-- Google Maps Directions API for real road routes
-- OSRM (OpenStreetMap) for route alternatives
-- Anthropic Claude for explanation phrasing
-- TomTom for live incident monitoring
+The objective is to predict the damage grade of a building based on its available features.
 
-## Project structure
+| Damage Grade | Description |
+|---|---|
+| Grade 1 | Low damage |
+| Grade 2 | Medium damage |
+| Grade 3 | Severe damage or near-complete destruction |
+
+This is a **supervised multiclass classification problem**.
+
+## 🎯 Objectives
+
+- Understand and preprocess real-world earthquake building data.
+- Handle numerical and categorical features.
+- Implement and compare multiple machine learning models.
+- Evaluate model performance using appropriate classification metrics.
+- Analyze confusion matrices and feature importance.
+- Generate predictions for the competition test dataset.
+- Automate the generation of evaluation reports and presentation slides.
+- Maintain a reproducible and organized ML workflow.
+
+## 📊 Dataset
+
+The project uses the dataset from the DrivenData competition:
+
+**Richter's Predictor: Modeling Earthquake Damage**
+
+Dataset link: https://www.drivendata.org/competitions/57/nepal-earthquake/data/
+
+Download the required CSV files from the competition page. Sign-in and acceptance of the competition terms may be required.
+
+### Dataset files
+
+| File | Description | Records |
+|---|---|---:|
+| `train_values.csv` | Building features for training | 260,601 |
+| `train_labels.csv` | Building damage labels | 260,601 |
+| `test_values.csv` | Building features for prediction | 86,868 |
+
+The feature dataset contains 38 input features and a building identifier. The target dataset contains the building identifier and `damage_grade`.
+
+### Feature categories
+
+The dataset contains information about:
+
+- **Geographic features:** Geographic level 1, level 2, and level 3 identifiers.
+- **Building structure:** Number of floors, building age, building area, and height-related characteristics.
+- **Construction materials:** Foundation, roof, ground floor, and other construction attributes.
+- **Structural indicators:** Superstructure types and other building characteristics.
+- **Additional attributes:** Secondary building uses and other recorded properties.
+
+### Dataset setup
+
+Create a folder named `data` in the project root and place the downloaded files inside it.
 
 ```text
-geoagentic/
-├── README.md
-├── schema.sql
-├── start.bat
-├── start.sh
-├── backend/
-│   ├── .env.example
-│   ├── requirements.txt
-│   ├── geoagentic.db
-│   ├── app/
-│   └── tests/
-├── frontend/
-│   ├── package.json
-│   ├── src/
-│   └── node_modules/
-└── .gitignore
+data/
+├── train_values.csv
+├── train_labels.csv
+└── test_values.csv
 ```
 
-## Prerequisites
+**Note:** Raw datasets are excluded from Git version control. Download them separately and follow the competition's data-use terms.
 
-Before running the app:
-- Python 3.10+
-- Node.js 18+
-- npm
-- A terminal such as PowerShell, Command Prompt, or Bash
+## 🧠 Machine Learning Models
 
-## Environment setup
+### 1. K-Nearest Neighbours (KNN)
 
-### 1. Backend environment
-From the project root:
+KNN classifies a building based on the labels of nearby examples in feature space.
 
-Windows PowerShell:
-```powershell
-cd .\geoagentic\backend
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
+**Implementation includes:**
+- Categorical feature encoding.
+- Feature scaling.
+- Feature selection using `SelectKBest`.
+- Distance-based classification.
+
+**Purpose:** Establish a baseline for comparison with more complex models.
+
+### 2. Neural Network using NumPy
+
+The project implements a two-layer neural network using NumPy rather than a deep-learning framework.
+
+**Implementation includes:**
+- Forward propagation.
+- Hidden-layer sigmoid activation.
+- Softmax output layer.
+- Mini-batch training.
+- L2 regularization.
+- Training-loss tracking.
+
+**Purpose:** Explore how a neural network learns nonlinear relationships in building data.
+
+### 3. Random Forest Classifier
+
+Random Forest combines multiple decision trees to improve predictive performance.
+
+**Implementation includes:**
+- Categorical feature preprocessing.
+- Ensemble-based classification.
+- Hyperparameter tuning using GridSearchCV.
+- Feature-importance analysis.
+
+**Purpose:** Learn nonlinear relationships and interactions among structural, geographic, and construction features.
+
+## 🔄 Project Workflow
+
+```mermaid
+flowchart TD
+    A[Load Dataset] --> B[Data Validation]
+    B --> C[Preprocessing]
+    C --> D[Train-Holdout Split]
+    D --> E[KNN Model]
+    D --> F[NumPy Neural Network]
+    D --> G[Random Forest]
+    E --> H[Model Evaluation]
+    F --> H
+    G --> H
+    H --> I[Compare Model Performance]
+    I --> J[Generate Visualizations]
+    I --> K[Generate Predictions]
+    J --> L[PDF Report and PowerPoint]
+    K --> M[Submission CSV]
 ```
 
-Linux/macOS:
+### Workflow explanation
+
+1. Load the training features, training labels, and test features.
+2. Validate the data and prepare the input features.
+3. Encode categorical features and scale numerical features where appropriate.
+4. Split the labelled data into training and holdout sets.
+5. Train KNN, the NumPy neural network, and Random Forest.
+6. Evaluate the models using classification metrics.
+7. Save model comparisons, confusion matrices, and feature-importance plots.
+8. Select a model for generating predictions.
+9. Generate the submission CSV, PDF report, and PowerPoint slides.
+
+## 📁 Project Structure
+
+```text
+nepal-earthquake-damage/
+│
+├── data/
+│   ├── train_values.csv
+│   ├── train_labels.csv
+│   └── test_values.csv
+│
+├── data_synth/
+│   └── Synthetic data for testing
+│
+├── src/
+│   ├── data.py
+│   ├── models.py
+│   ├── neural_net.py
+│   ├── train.py
+│   └── run_all.py
+│
+├── tests/
+│   └── make_synthetic.py
+│
+├── docs/
+│   ├── build_writeup.py
+│   ├── build_slides.py
+│   └── common.py
+│
+├── results/
+│   ├── metrics.json
+│   ├── model_comparison.png
+│   ├── confusion_matrices.png
+│   ├── rf_feature_importance.png
+│   └── nn_loss.png
+│
+├── requirements.txt
+├── .gitignore
+└── README.md
+```
+
+### Important files
+
+| File | Responsibility |
+|---|---|
+| `src/data.py` | Loads datasets and defines preprocessing utilities |
+| `src/models.py` | Defines the KNN, neural network, and Random Forest pipelines |
+| `src/neural_net.py` | Implements the neural network using NumPy |
+| `src/train.py` | Trains models, evaluates performance, and generates results |
+| `src/run_all.py` | Coordinates the complete project workflow |
+| `tests/make_synthetic.py` | Creates synthetic data for pipeline testing |
+| `docs/build_writeup.py` | Generates the PDF report |
+| `docs/build_slides.py` | Generates the PowerPoint presentation |
+| `results/metrics.json` | Stores model evaluation results |
+
+## 🛠️ Technologies Used
+
+| Technology | Purpose |
+|---|---|
+| Python | Core programming language |
+| NumPy | Numerical computations and neural network |
+| Pandas | Dataset loading and manipulation |
+| Scikit-learn | Preprocessing, classification, and evaluation |
+| Matplotlib | Data visualization |
+| ReportLab | PDF report generation |
+| python-pptx | PowerPoint generation |
+| Git and GitHub | Version control and collaboration |
+
+## ⚙️ Installation and Setup
+
+### Prerequisites
+
+Install the following before starting:
+
+- Python 3.10 or newer.
+- pip package manager.
+- Git.
+- VS Code or another Python-compatible editor.
+- The required competition CSV files.
+
+### Step 1: Clone the repository
+
+Replace the placeholders with your actual GitHub username and repository name.
+
 ```bash
-cd geoagentic/backend
+git clone https://github.com/<YOUR-USERNAME>/<YOUR-REPOSITORY>.git
+cd <YOUR-REPOSITORY>
+```
+
+If you already have the project on your computer, open the project folder directly in VS Code.
+
+### Step 2: Create a virtual environment
+
+**Windows PowerShell**
+
+```powershell
+py -m venv .venv
+.\.venv\Scripts\Activate.ps1
+```
+
+If PowerShell blocks activation, use Command Prompt:
+
+```bat
+.venv\Scripts\activate.bat
+```
+
+**Linux or macOS**
+
+```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
 ```
 
-### 2. Create environment file
+### Step 3: Install dependencies
+
 ```bash
-cp .env.example .env
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
 ```
 
-On Windows PowerShell:
-```powershell
-Copy-Item .env.example .env
+### Step 4: Prepare the dataset
+
+Download the competition dataset and place the CSV files inside the `data` folder.
+
+Verify the filenames:
+
+```text
+data/train_values.csv
+data/train_labels.csv
+data/test_values.csv
 ```
 
-Edit the `.env` file if you want to enable external integrations.
+### Step 5: Verify the environment
 
-Example environment variables:
-```env
-DATABASE_URL=sqlite:///geoagentic.db
-GOOGLE_MAPS_API_KEY=
-GOOGLE_MAPS_REGION=in
-ANTHROPIC_API_KEY=
-CLAUDE_MODEL=claude-sonnet-5-5
-TOMTOM_API_KEY=
-ROUTING_PROVIDER=auto
-OSRM_BASE_URL=https://router.project-osrm.org
-GOOGLE_MAPS_TIMEOUT_S=3
-OSRM_TIMEOUT_S=2.5
-```
-
-Notes:
-- If the keys are empty, the app still runs using fallback mock data.
-- The app validates all coordinates against Bengaluru bounds.
-- `auto` tries Google Maps first, then OSRM, then mock routes. Provider requests
-  have short configurable timeouts so a slow API is less likely to delay dispatch.
-
-## How to run the app
-
-### Option A: Run backend and frontend manually
-
-#### Backend
 ```bash
-cd geoagentic/backend
-source .venv/bin/activate    # or .\.venv\Scripts\Activate.ps1 on Windows
-uvicorn app.main:app --reload --port 8000
+python --version
+python -m pip list
 ```
 
-Then open:
-- API docs: http://127.0.0.1:8000/docs
-- Health endpoint: http://127.0.0.1:8000/api/health
-- Config status: http://127.0.0.1:8000/api/config/status
+Run subsequent commands from the project root, where `src/` and `requirements.txt` are located.
 
-#### Frontend
-Open a second terminal:
+## ▶️ How to Run the Project
+
+### Option 1: Run the complete pipeline
+
+This is the recommended command for a full project run.
+
 ```bash
-cd geoagentic/frontend
-npm install
-npm run dev -- --host 0.0.0.0
+python -m src.run_all --data_dir data --team "Your Team | Section A"
 ```
 
-Open in browser:
-- http://localhost:5173
+The workflow runs the training and evaluation process, generates the available plots and metrics, and creates the report, slides, and predictions where supported by the pipeline and input files.
 
-If port 5173 is already occupied, Vite will automatically choose another open port, such as 5174.
+Replace `Your Team | Section A` with the actual team information.
 
-### Option B: Run both with helper scripts
+### Option 2: Run a quick demonstration
 
-Windows:
-```powershell
-cd geoagentic
-start.bat
-```
-
-Linux/macOS:
 ```bash
-cd geoagentic
-chmod +x start.sh
-./start.sh
+python -m src.run_all --data_dir data --fast --team "Your Team | Section A"
 ```
 
-## Working API and app behavior
+The `--fast` option uses a smaller subset of the labelled data and a reduced model search to speed up testing.
 
-The app starts with demo emergency vehicles seeded into the database:
-- AMB-01
-- FIRE-01
-- POL-01
-- AMB-02
+**Important:** Quick-mode results are preliminary and must not be presented as full-dataset results.
 
-Supported workflow:
-1. Create or select a vehicle.
-2. Create a mission with origin and destination.
-3. Select a route.
-4. Inject an incident such as accident, flood, traffic, or hazard.
-5. GeoAgent evaluates the route and suggests a reroute if needed.
-6. Dispatcher approves or dismisses the suggestion.
+### Option 3: Train and evaluate models only
 
-## Optional external API configuration
-
-### Google Maps
-Set:
-```env
-GOOGLE_MAPS_API_KEY=your_key_here
-GOOGLE_MAPS_REGION=in
-```
-This enables real route generation and traffic-aware ETAs.
-Google is tried before OSRM in `auto` mode. If a request is slow or fails, the
-backend continues to the configured fallback instead of waiting for the previous
-six-second default timeout. Tune the limit with `GOOGLE_MAPS_TIMEOUT_S` (default
-3 seconds).
-
-### Anthropic Claude
-Set:
-```env
-ANTHROPIC_API_KEY=your_key_here
-CLAUDE_MODEL=claude-sonnet-5-5
-```
-This improves explanation text for recommendations.
-
-### TomTom
-Set:
-```env
-TOMTOM_API_KEY=your_key_here
-```
-This enables live traffic monitoring and route-scoped incident checks.
-
-### OSRM
-Set:
-```env
-ROUTING_PROVIDER=osrm
-OSRM_BASE_URL=https://router.project-osrm.org
-```
-OSRM can be used as a no-key fallback route provider if Google Maps is not configured.
-Its request timeout defaults to 2.5 seconds (`OSRM_TIMEOUT_S`). In `auto` mode
-this runs only after Google does not return routes.
-
-## Troubleshooting
-
-### Backend offline
-The frontend may show a red backend offline banner if FastAPI is not running.
-Fix:
 ```bash
-cd geoagentic/backend
-source .venv/bin/activate
-uvicorn app.main:app --reload --port 8000
+python -m src.train --data_dir data
 ```
 
-### Port already in use
-If 5173 is busy, Vite will move to another port such as 5174.
-Use the URL shown in the terminal.
+To specify a custom output directory:
 
-### Routes look like curves instead of road-following lines
-This usually means the routing API is unavailable or disabled.
-The app will fallback automatically to its mock route generator.
-
-### Place search returns limited results
-The app includes built-in place data and can fall back to offline results if the online geocoder is not available.
-
-### Duplicate vehicle names
-Vehicle callsigns must be unique. Use a different callsign if the app reports a duplicate vehicle error.
-
-## Validation / testing
-
-Run backend tests:
 ```bash
-cd geoagentic/backend
-source .venv/bin/activate
-pytest -q
+python -m src.train --data_dir data --out results
 ```
 
-This validates the route generation and agent behaviors in the offline test suite.
+To view supported options:
 
-## Notes
-- The demo is intended for local development and simulation, not production dispatch operations.
-- The project is bounded to Bengaluru coordinates for consistency and demo realism.
-- All external APIs are optional; the application remains functional without them.
+```bash
+python -m src.train --help
+```
+
+### Option 4: Test the pipeline with synthetic data
+
+Use this option to check basic pipeline execution without downloading the full competition dataset.
+
+```bash
+python tests/make_synthetic.py --out data_synth
+python -m src.train --data_dir data_synth --out results_synth
+```
+
+Synthetic data is only for testing the workflow. Its evaluation scores do not represent the model's real-world predictive performance.
+
+### Option 5: Generate the report and slides separately
+
+After the training results have been saved:
+
+```bash
+python docs/build_writeup.py --results results --out writeup.pdf --team "Your Team | Section A"
+```
+
+Generate the presentation:
+
+```bash
+python docs/build_slides.py --results results --out slides.pptx --team "Your Team | Section A"
+```
+
+Check each script's help output if your local version uses different options.
+
+## 📈 Results and Evaluation
+
+The saved evaluation results from the current project run are summarized below.
+
+| Model | Training Micro-F1 | Holdout Micro-F1 |
+|---|---:|---:|
+| KNN | 67.09% | 64.61% |
+| Neural Network | 65.08% | 65.44% |
+| Random Forest | 98.68% | **72.20%** |
+
+**Best recorded holdout model:** Random Forest, with a micro-F1 score of 72.20%.
+
+The Random Forest shows a substantial training-to-holdout performance gap, suggesting possible overfitting. Additional hyperparameter tuning and validation are recommended.
+
+These are previously saved results, not a guarantee of performance on a fresh run or the official competition leaderboard.
+
+### Evaluation metrics
+
+- **Micro-F1:** Measures overall classification performance across all predictions.
+- **Macro-F1:** Gives equal weight to each damage grade.
+- **Precision:** Measures how often predictions for a grade are correct.
+- **Recall:** Measures how many actual examples of a grade are identified.
+- **Confusion matrix:** Shows the damage grades the model confuses.
+- **Feature importance:** Identifies features that contribute to Random Forest predictions.
+- **Training time:** Measures the computational cost of model fitting.
+
+For this single-label multiclass problem, micro-F1 equals accuracy. Macro-F1 and class-specific recall are also important because performance can vary across damage grades.
+
+## 📂 Output Files
+
+After a successful run, check the `results/` folder.
+
+| File | Description |
+|---|---|
+| `metrics.json` | Evaluation scores and model information |
+| `model_comparison.png` | Training and holdout score comparison |
+| `confusion_matrices.png` | Confusion matrices for the trained models |
+| `rf_feature_importance.png` | Random Forest feature-importance chart |
+| `nn_loss.png` | Neural network training-loss plot |
+| `submission.csv` | Predictions for the competition test dataset |
+
+The report and presentation scripts generate:
+
+- `writeup.pdf` — project report.
+- `slides.pptx` — PowerPoint presentation.
+
+The exact files produced depend on the pipeline options and available input data.
+
+### Submission CSV format
+
+The generated competition submission is expected to contain:
+
+```csv
+building_id,damage_grade
+```
+
+Each test building receives a predicted damage grade of `1`, `2`, or `3`. Check the competition's current submission instructions before uploading it.
+
+## 🐛 Troubleshooting
+
+### 1. Module import error
+
+If Python reports that the `src` module cannot be found, make sure you are running the command from the project root.
+
+Use:
+
+```bash
+python -m src.run_all --data_dir data
+```
+
+### 2. Dataset file not found
+
+Verify that all CSV files are inside the root-level `data/` folder and their filenames match the expected names.
+
+### 3. Missing Python package
+
+Activate your virtual environment and run:
+
+```bash
+python -m pip install -r requirements.txt
+```
+
+### 4. PowerShell activation issue
+
+Use Command Prompt:
+
+```bat
+.venv\Scripts\activate.bat
+```
+
+### 5. Training is taking too long
+
+Run the quick demonstration first:
+
+```bash
+python -m src.run_all --data_dir data --fast
+```
+
+Use the full pipeline when you are ready to obtain full-run results.
+
+### 6. PDF or PowerPoint contains old results
+
+Rerun the training pipeline successfully before regenerating the report and slides.
+
+## 🚀 Future Enhancements
+
+- Reduce Random Forest overfitting through systematic hyperparameter tuning.
+- Evaluate macro-F1 and severe-damage recall.
+- Compare gradient boosting algorithms such as XGBoost, LightGBM, and CatBoost.
+- Explore better representations of geographic identifiers.
+- Improve reproducibility through cross-validation and a separate final evaluation set.
+- Add a simple interface for entering building features and displaying predictions.
+- Evaluate the model's reliability and limitations before considering any real disaster-response application.
+
+## 📚 References
+
+1. DrivenData — Richter's Predictor: Modeling Earthquake Damage.  
+   https://www.drivendata.org/competitions/57/nepal-earthquake/
+
+2. Stanford CS229 — Application of Machine Learning Methods to Predict the Level of Buildings Damage in the Nepal Earthquake, 2021.
+
+## 👥 Team Members
+
+**Course:** UE24CS352A — Machine Learning Mini-Project
+
+**Institution:** Add your institution name.
+
+**Section:** Add your section.
+
+**Team members:**
+- Member 1 — Name / SRN
+- Member 2 — Name / SRN
+- Member 3 — Name / SRN
+- Member 4 — Name / SRN
+
+Replace these placeholders with the actual team details before submission.
+
+---
+
+<div align="center">
+
+**Built for machine learning education and earthquake damage research.**
+
+⭐ If you find this project useful, consider starring the repository.
+
+</div>
